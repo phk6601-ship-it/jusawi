@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>우리반 주사위</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<style>
+/* Layout: 화면 전체가 초록 게임판. 어디를 눌러도 주사위가 굴러가고, 결과 숫자는 위에 크게 */
+:root {
+  --felt: #1f6a55;
+  --felt-dark: #123f33;
+  --rim: #0c2a22;
+  --ivory: #fbf8f1;
+  --ivory-edge: #e4ddcd;
+  --pip: #23262e;
+  --pip-red: #d8343f;
+  --sun: #ffd25a;
+  --round: "Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --size: min(46vw, 40vh, 250px);
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; }
+body {
+  background: radial-gradient(ellipse at 50% 45%, var(--felt) 0%, var(--felt-dark) 75%, var(--rim) 100%);
+  background-color: var(--felt-dark);
+  color: var(--ivory);
+  font-family: var(--round);
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.app { height: 100%; display: flex; flex-direction: column; align-items: center; padding-inline: 16px; padding-block: 20px; box-sizing: border-box; }
+.top { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 9rem; justify-content: center; }
+.label { font-size: clamp(1.1rem, 3vw, 1.5rem); opacity: .75; letter-spacing: .04em; }
+.result { font-size: clamp(4rem, 14vw, 7.5rem); line-height: 1; color: var(--sun); text-shadow: 0 4px 0 rgba(0,0,0,.25); font-variant-numeric: tabular-nums; }
+.result.pop { animation: pop .45s cubic-bezier(.2,1.6,.4,1); }
+.result.wait { color: var(--ivory); opacity: .35; }
+
+.table { position: relative; flex: 1; width: 100%; max-width: 900px; cursor: pointer; outline: none; }
+.table:focus-visible { box-shadow: inset 0 0 0 3px var(--sun); border-radius: 24px; }
+.mover { position: absolute; left: 50%; top: 50%; width: var(--size); height: var(--size); margin-left: calc(var(--size) / -2); margin-top: calc(var(--size) / -2); will-change: transform; }
+.shadow { position: absolute; left: 50%; top: 50%; width: var(--size); height: calc(var(--size) * .3); margin-left: calc(var(--size) / -2); margin-top: calc(var(--size) * .42); border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.45), transparent); will-change: transform, opacity; }
+.view { width: 100%; height: 100%; perspective: 900px; }
+.tilt { width: 100%; height: 100%; transform-style: preserve-3d; }
+.cube { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+.face, .core {
+  position: absolute; inset: 0; box-sizing: border-box;
+  background: radial-gradient(circle at 35% 30%, var(--ivory), var(--ivory) 55%, var(--ivory-edge));
+  border-radius: 16%;
+  backface-visibility: hidden;
+}
+.core { border-radius: 0; inset: 6%; background: var(--ivory-edge); backface-visibility: visible; }
+.face { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); padding: 12%; background: var(--ivory); border: calc(var(--size) * .02) solid var(--ivory-edge); }
+.pip { width: 76%; height: 76%; place-self: center; border-radius: 50%; background: var(--pip); }
+.pip.red { width: 100%; height: 100%; background: var(--pip-red); }
+.f1 { transform: translateZ(calc(var(--size) / 2)); }
+.f6 { transform: rotateY(180deg) translateZ(calc(var(--size) / 2)); }
+.f3 { transform: rotateY(90deg) translateZ(calc(var(--size) / 2)); }
+.f4 { transform: rotateY(-90deg) translateZ(calc(var(--size) / 2)); }
+.f2 { transform: rotateX(90deg) translateZ(calc(var(--size) / 2)); }
+.f5 { transform: rotateX(-90deg) translateZ(calc(var(--size) / 2)); }
+.c1 { transform: translateZ(0); }
+.c2 { transform: rotateY(90deg); }
+.c3 { transform: rotateX(90deg); }
+
+.bottom { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.roll {
+  font-family: var(--round); font-size: clamp(1.6rem, 4.5vw, 2.2rem);
+  padding: 16px 56px; border-radius: 999px; border: 0; cursor: pointer;
+  background: var(--sun); color: var(--felt-dark);
+  box-shadow: 0 7px 0 #c99a1e, 0 12px 24px rgba(0,0,0,.25);
+  transition: transform .08s, box-shadow .08s, opacity .2s;
+}
+.roll:active { transform: translateY(5px); box-shadow: 0 2px 0 #c99a1e; }
+.roll:disabled { opacity: .55; }
+.roll:focus-visible { outline: 3px solid var(--ivory); outline-offset: 4px; }
+.row { display: flex; gap: 10px; align-items: center; }
+.small { font-family: var(--round); font-size: 1rem; background: transparent; color: var(--ivory); border: 1px solid rgba(255,255,255,.3); border-radius: 999px; padding: 6px 14px; cursor: pointer; opacity: .8; }
+.history { display: flex; gap: 6px; min-height: 2rem; flex-wrap: wrap; justify-content: center; }
+.history span { width: 2rem; height: 2rem; border-radius: 8px; background: rgba(255,255,255,.12); display: grid; place-items: center; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.history span:first-child { background: var(--ivory); color: var(--felt-dark); }
+
+@keyframes pop { 0% { transform: scale(.4); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .result.pop { animation: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="label" id="label">주사위를 눌러 굴려 보세요</div>
+    <div class="result wait" id="result">?</div>
+  </div>
+
+  <div class="table" id="table" tabindex="0" aria-label="주사위 굴리기">
+    <div class="shadow" id="shadow"></div>
+    <div class="mover" id="mover">
+      <div class="view"><div class="tilt">
+        <div class="cube" id="cube">
+          <div class="core c1"></div><div class="core c2"></div><div class="core c3"></div>
+          <div class="face f1"></div><div class="face f2"></div><div class="face f3"></div>
+          <div class="face f4"></div><div class="face f5"></div><div class="face f6"></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <button class="roll" id="roll">굴리기!</button>
+    <div class="row">
+      <div class="history" id="history"></div>
+    </div>
+    <button class="small" id="sound">소리 켜짐</button>
+  </div>
+</div>
+
+<script>
+// 눈 배치 (3x3 칸 번호 0~8)
+const LAYOUT = { 1:[4], 2:[2,6], 3:[2,4,6], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
+for (let n = 1; n <= 6; n++) {
+  const face = document.querySelector(".f" + n);
+  for (let c = 0; c < 9; c++) {
+    const cell = document.createElement("div");
+    if (LAYOUT[n].includes(c)) { cell.className = "pip" + (n === 1 ? " red" : ""); }
+    cell.style.gridArea = `${Math.floor(c / 3) + 1} / ${c % 3 + 1}`;
+    if (!LAYOUT[n].includes(c)) cell.style.visibility = "hidden";
+    face.appendChild(cell);
+  }
+}
+
+// 각 숫자가 정면으로 오게 하는 회전값
+const FACE_ROT = { 1:[0,0], 2:[-90,0], 3:[0,-90], 4:[0,90], 5:[90,0], 6:[0,180] };
+
+const cube = document.getElementById("cube");
+const tilt = document.querySelector(".tilt");
+const mover = document.getElementById("mover");
+const shadow = document.getElementById("shadow");
+const table = document.getElementById("table");
+const rollBtn = document.getElementById("roll");
+const resultEl = document.getElementById("result");
+const labelEl = document.getElementById("label");
+const historyEl = document.getElementById("history");
+const soundBtn = document.getElementById("sound");
+
+let rot = { x: 0, y: 0, z: 0 };
+let rolling = false, soundOn = true, actx = null, history = [];
+
+function setCube(x, y, z) { cube.style.transform = `rotateX(${x}deg) rotateY(${y}deg) rotateZ(${z}deg)`; }
+setCube(-90, 0, 0); rot = { x: -90, y: 0, z: 0 }; // 처음엔 2가 정면으로 보이게
+
+// 소리: 또르르륵 + 탁
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+  if (actx && actx.state === "suspended") actx.resume();
+  return actx;
+}
+function tick(vol, pitch) {
+  if (!soundOn || !actx) return;
+  const t = actx.currentTime;
+  const len = 0.035;
+  const buf = actx.createBuffer(1, Math.floor(actx.sampleRate * len), actx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+  const src = actx.createBufferSource(); src.buffer = buf;
+  const bp = actx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = pitch; bp.Q.value = 2.5;
+  const g = actx.createGain(); g.gain.value = vol;
+  src.connect(bp).connect(g).connect(actx.destination);
+  src.start(t);
+}
+
+const ease = t => 1 - Math.pow(1 - t, 3.2);
+
+function roll() {
+  if (rolling) return;
+  rolling = true;
+  audio();
+  rollBtn.disabled = true;
+  resultEl.classList.add("wait"); resultEl.classList.remove("pop");
+  resultEl.textContent = "?";
+  labelEl.textContent = "데구르르…";
+
+  const value = 1 + Math.floor(Math.random() * 6);
+  const [fx, fy] = FACE_ROT[value];
+  const spins = () => (3 + Math.floor(Math.random() * 3)) * 360 * (Math.random() < .5 ? -1 : 1);
+  const norm = a => a - (a % 360);
+  const start = { ...rot };
+  const target = {
+    x: norm(start.x) + fx + spins(),
+    y: norm(start.y) + fy + spins(),
+    z: norm(start.z) + spins(),
+  };
+
+  const w = table.clientWidth, h = table.clientHeight;
+  const side = Math.random() < .5 ? -1 : 1;
+  const x0 = side * Math.min(w * 0.38, 320), y0 = -Math.min(h * 0.25, 120);
+  const x1 = (Math.random() - .5) * Math.min(w * 0.2, 120), y1 = (Math.random() - .5) * Math.min(h * 0.12, 50);
+
+  const DUR = 2600;
+  const t0 = performance.now();
+  let lastQuarter = 0, lastBounce = 0;
+  const totalAngle = Math.abs(target.x - start.x) + Math.abs(target.y - start.y) + Math.abs(target.z - start.z);
+
+  function frame(now) {
+    const t = Math.min(1, (now - t0) / DUR);
+    const e = ease(t);
+    const rx = start.x + (target.x - start.x) * e;
+    const ry = start.y + (target.y - start.y) * e;
+    const rz = start.z + (target.z - start.z) * e;
+    setCube(rx, ry, rz);
+    // 굴러가는 동안만 비스듬히, 멈추면 숫자 면이 정면으로
+    const k = Math.sin(Math.PI * Math.min(1, e * 1.05));
+    tilt.style.transform = `rotateX(${-24 * k}deg) rotateY(${-30 * k}deg)`;
+
+    // 통통 튀다가 점점 바닥에서 또르르 구르기
+    const bounces = 4;
+    const bt = Math.min(1, t / 0.55);
+    const hop = t < 0.55 ? Math.abs(Math.sin(Math.PI * bt * bounces)) * Math.pow(1 - bt, 1.6) * Math.min(h * 0.35, 170) : 0;
+    const px = x0 + (x1 - x0) * e;
+    const py = y0 + (y1 - y0) * e - hop;
+    const sq = t > 0.97 ? 1 + Math.sin((t - 0.97) / 0.03 * Math.PI) * 0.03 : 1;
+    mover.style.transform = `translate(${px}px, ${py}px) scale(${sq})`;
+    const sx = x0 + (x1 - x0) * e, sy = y0 + (y1 - y0) * e;
+    const s = 1 - Math.min(hop / 260, 0.55);
+    shadow.style.transform = `translate(${sx}px, ${sy}px) scale(${s})`;
+    shadow.style.opacity = 0.35 + 0.65 * s;
+
+    // 바닥에 닿을 때 탁
+    const bIdx = Math.floor(bt * bounces);
+    if (t < 0.55 && bIdx > lastBounce) { lastBounce = bIdx; tick(0.9 * (1 - bt) + 0.2, 380); }
+
+    // 모서리가 넘어갈 때마다 또르르륵
+    const quarter = Math.floor((totalAngle * e) / 120);
+    if (quarter > lastQuarter) { lastQuarter = quarter; tick(0.25 + 0.35 * (1 - t), 1500 + Math.random() * 900); }
+
+    if (t < 1) { requestAnimationFrame(frame); return; }
+
+    rot = target;
+    tilt.style.transform = "none";
+    tick(0.7, 300);
+    finish(value);
+  }
+  requestAnimationFrame(frame);
+}
+
+function finish(value) {
+  resultEl.textContent = value;
+  resultEl.classList.remove("wait");
+  void resultEl.offsetWidth;
+  resultEl.classList.add("pop");
+  labelEl.textContent = "나온 숫자";
+  history.unshift(value); history = history.slice(0, 10);
+  historyEl.innerHTML = history.map(v => `<span>${v}</span>`).join("");
+  rollBtn.disabled = false;
+  rolling = false;
+}
+
+rollBtn.addEventListener("click", roll);
+table.addEventListener("click", roll);
+table.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); roll(); } });
+soundBtn.addEventListener("click", () => {
+  soundOn = !soundOn;
+  soundBtn.textContent = soundOn ? "소리 켜짐" : "소리 꺼짐";
+  if (soundOn) audio();
+});
+</script>
+</body>
+</html>
